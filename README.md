@@ -1,104 +1,36 @@
-# @dialectlabs/actions
-
-This repository contains reference implementations of Solana Actions using [Hono](https://hono.dev/), [Next.js](https://nextjs.org/), and [Express](https://expressjs.com/).
+This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started
 
-For Hono, run the development server in the root directory:
-
-For Next.js, run the development server in it's [directory](examples/nextjs):
-
-For Express, run the development server in the subfolder in it's [directory](examples/express):
+First, run the development server:
 
 ```bash
-npm install
 npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-## Presets
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-### Tensor Buy Floor
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-- Place your api key to `TENSOR_API_KEY` constant in tensor-api.ts
-
-## How To
-
-### Actions Development with Hono
-
-1. See [Jupiter Swap Action example](examples/hono/examples/jupiter-swap/route.ts)
-2. Build your own action
-   - Use specified openapi `responses` from [openapi.ts](examples/hono/examples/openapi.ts) for your POST, GET methods
-   - Use specified openapi `body` from [openapi.ts](examples/hono/examples/openapi.ts) for your POST methods
-3. Add your router to [index.ts](examples/hono/examples/index.ts)
-
-### Actions Development with Next.js
-
-1. See [Donate Native SOL Action example](examples/nextjs/src/app/api/actions/donate-sol/route.ts)
-2. Build your own action
-   - Create a new folder in [src/app/api/actions](examples/nextjs/src/app/api/actions) with your action name
-   - Under that folder, create a route.ts file with your action
-
-### Actions Development with Express
-
-1. See [Donate Native SOL Action example](examples/express/transfer-sol/server.js)
-2. Build your own action
-   - Create a new folder in [examples/express](examples/express) with your action name
-   - Under that folder, create a server.js file with your action and make the necessary imports
-
-### Swagger UI
-
-With Hono, open [http://localhost:3000/swagger-ui](http://localhost:3000/swagger-ui) with your browser to explore actions.
-
-### Unfurl action into a Blink
-
-To check and unfurl your or existing action open
-[https://actions.dialect.to/](https://actions.dialect.to/)  
-e.g action for swap on Jupiter using Hono: <localhost:3000/api/jupiter/swap/SOL-Bonk>
-
-## Examples in this repo
-
-### Hono
-
-There is a simple donate action as well as a memo action in this repo which serves as a template for creating your own actions.
-
-There are also a few example actions in this repository for [Jupiter](examples/jupiter-swap/route.ts) (swap), [Helius](examples/helius/stake/route.ts) (stake), [Meteora](examples/meteora/swap/route.ts) (swap), [Sanctum](examples/sanctum/trade/route.ts) (stake), and [Tensor](examples/tensor) (buy floor or bid).
-
-You can also unfurl these actions into Blinks on https://dial.to by entering the action URL into the Blink URL field.
-
-For example, to unfurl the Helius stake action, you would enter the following URL into the Blink URL field:
-
-`http://localhost:3000/api/helius/stake`
-
-### Next.js
-
-There are a few example actions in this repository for [Donating Native SOL](examples/nextjs/src/app/api/actions/donate-sol/route.ts) and [Donating SPL Tokens](examples/nextjs/src/app/api/actions/donate-token/route.ts).
-
-To unfurl these actions into Blinks on https://dial.to by entering the action URL into the Blink URL field.
-
-For example, to unfurl the Donate Native SOL action, you would enter the following URL into the Blink URL field:
-
-`http://localhost:3000/api/actions/donate-sol`
-
-### Express
-
-There is an example action in this repository for [Donating Native SOL](examples/express/transfer-sol/server.js).
-
-To unfurl this action into Blinks on https://dial.to by entering the action URL into the Blink URL field.
-
-For example, to unfurl the Donate Native SOL action, you would enter the following URL into the Blink URL field:
-
-`http://localhost:8080/api/actions/transfer-sol`
+This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
 
 ## Learn More
-
-To learn more about Hono, take a look at the following resources:
-
-- [Hono Documentation](https://hono.dev/docs/) - learn about Hono features and API.
 
 To learn more about Next.js, take a look at the following resources:
 
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-To learn more about Express, take a look at the following resources:
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
 
-- [Express Documentation](https://expressjs.com/en/guide/routing.html) - learn about Express features and API.
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.

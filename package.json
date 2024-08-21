@@ -1,34 +1,30 @@
 {
-  "name": "@dialectlabs/actions",
-  "version": "0.0.0",
-  "license": "Apache-2.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/dialectlabs/actions"
-  },
+  "name": "nextjs",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "dev": "tsx watch examples/hono/examples/index.ts"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
-    "@hono/node-server": "^1.12.0",
-    "@hono/swagger-ui": "^0.4.0",
-    "@hono/zod-openapi": "^0.15.0",
-    "@jup-ag/api": "^6.0.23",
-    "@mercurial-finance/dynamic-amm-sdk": "^0.4.23",
-    "@solana/actions": "^1.6.1",
-    "@solana/spl-token-registry": "^0.2.4574",
+    "@solana/actions": "^1.4.0",
     "@solana/web3.js": "^1.95.2",
-    "cors": "^2.8.5",
-    "express": "^4.19.2",
-    "hono": "^4.5.0",
-    "mathjs": "^13.0.0",
-    "sanctum-lst-list": "^0.2.13",
-    "zod": "^3.23.8"
+    "@tabler/icons": "^3.11.0",
+    "@tabler/icons-react": "^3.11.0",
+    "next": "14.2.5",
+    "react": "^18",
+    "react-dom": "^18"
   },
   "devDependencies": {
-    "@types/bn.js": "^5.1.5",
-    "@types/node": "^20.11.17",
-    "prettier": "^3.3.2",
-    "tsx": "^4.7.1"
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.5",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
   }
 }
