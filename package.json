@@ -9,13 +9,20 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@apollo/client": "^3.8.0-beta.7",
+    "@azuro-org/dictionaries": "^3.0.12",
+    "@azuro-org/sdk": "^5.1.10",
     "@solana/actions": "^1.4.0",
     "@solana/web3.js": "^1.95.2",
     "@tabler/icons": "^3.11.0",
     "@tabler/icons-react": "^3.11.0",
+    "canvas": "^2.11.2",
+    "graphql": "^16.6.0",
     "next": "14.2.5",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "viem": "^2.20.0",
+    "wagmi": "^2.10.9"
   },
   "devDependencies": {
     "@types/node": "^20",
