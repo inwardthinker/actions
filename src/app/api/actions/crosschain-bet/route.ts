@@ -19,7 +19,8 @@ import {
   Transaction,
 } from '@solana/web3.js';
 import { createCanvas, loadImage } from 'canvas';
-import { encodeFunctionData } from 'viem';
+import { encodeAbiParameters, encodeFunctionData, parseAbiParameters, parseUnits, zeroAddress } from 'viem';
+import { useReadContract, useWriteContract } from 'wagmi';
 const FALLBACK_IMAGE_PATH = "src/app/assets/placeholder.svg"
 
 const headers = createActionHeaders();
@@ -140,7 +141,7 @@ export const GET = async (req: Request) => {
 
             return {
               label: `${participantName} (Odds: ${outcome.currentOdds})`,
-              value: outcome.outcomeId,
+              value: `${outcome.outcomeId + '__' + outcome.currentOdds}`,
             };
           }),
         },
@@ -164,8 +165,8 @@ export const GET = async (req: Request) => {
     const base64Image = await generateDynamicImage(matchData)
 
     const payload = {
-      title: `${matchData.homeTeam.name} vs ${matchData.awayTeam.name}`,
-      icon: `data:image/png;base64,${base64Image}` || "https://dev-avatars.azuro.org/images/33/1001000000001595522983/Korona Kielce.png",
+      title: `${matchData.homeTeam.name} vs ${matchData.awayTeam.name} `,
+      icon: `data: image / png; base64, ${base64Image} ` || "https://dev-avatars.azuro.org/images/33/1001000000001595522983/Korona Kielce.png",
       description: `${matchData.sport.name} > ${matchData.league.name}
 ${new Date(parseInt(matchData.startsAt || '0') * 1000).toLocaleString('UTC', {
         hour12: true,
@@ -174,7 +175,8 @@ ${new Date(parseInt(matchData.startsAt || '0') * 1000).toLocaleString('UTC', {
         day: 'numeric',
         hour: 'numeric',
         minute: 'numeric',
-      })} UTC
+      })
+        } UTC
 
 Bet on your favorite team via SOL now!
 
@@ -211,118 +213,122 @@ export const POST = async (req: Request) => {
     const { amount, toPubkey, gameId, conditionId } = validatedQueryParams(requestUrl, body);
 
     const walletAddress = (body?.data as unknown as { walletAddress: string })?.walletAddress;
+    const betOption = (body?.data as unknown as { betOption: string })?.betOption;
 
     // Validate the client provided input
     let account: PublicKey;
     try {
       account = new PublicKey(body.account);
     } catch (err) {
-      return new Response('Invalid "account" provided', {
-        status: 400,
-        headers,
-      });
+      return new Response('Invalid "account" provided', { status: 400, headers });
     }
 
-    const fromChainId = 7565164; // Assuming Solana chain ID for source chain
-    const fromTokenAddress = 'So11111111111111111111111111111111111111112'; // Solana native token address (assuming SOL)
-    const rawAmount = amount; // Convert amount from Solana to Polygon (USD to MATIC conversion logic)
+    const fromChainId = 7565164; // Solana chain ID
+    const fromTokenAddress = 'So11111111111111111111111111111111111111112'; // Solana native token address (SOL)
+    const rawAmount = BigInt(amount * LAMPORTS_PER_SOL); // Convert SOL to lamports
     const currentTime = Math.floor(Date.now() / 1000);
     const rawDeadline = currentTime + 2000;
     const affiliate = '0x39861ad41e6e4c43ed8c3423be5ef6faf91a3f84'; // Affiliate address
-    const minOdds = '4622743913683'; // Minimum odds for the bet
-    const betData = "..."
 
+    // Prepare DeBridge API parameters
     const params = new URLSearchParams({
-      dstChainId: '137',
-      srcChainOrderAuthorityAddress: body?.account as string, // Solana user address
+      dstChainId: '137', // Polygon
+      srcChainOrderAuthorityAddress: account.toBase58(),
       prependOperatingExpenses: 'false',
       srcChainId: String(fromChainId),
-      srcChainTokenIn: fromTokenAddress, // Solana token address
-      srcChainTokenInAmount: String(rawAmount),
-      dstChainTokenOut: process.env.POLYGONAMOY_TOKEN_ADDRESS || '0xc2132d05d31c914a87c6611c10748aeb04b58e8f',
+      srcChainTokenIn: fromTokenAddress,
+      srcChainTokenInAmount: rawAmount.toString(),
+      dstChainTokenOut: '0xc2132d05d31c914a87c6611c10748aeb04b58e8f',
       dstChainTokenOutAmount: 'auto',
-      dstChainTokenOutRecipient: walletAddress, // Polygon user address
-      dstChainOrderAuthorityAddress: walletAddress, // Polygon user address
-      externalCall: JSON.stringify({
-        version: 'evm_1',
-        fields: {
-          to: process.env.LP_ADDRESS, // Azuro LP contract address
-          data: encodeFunctionData({
-            abi: lpAbi,
-            functionName: 'betFor',
-            args: [
-              walletAddress,
-              process.env.CORE_ADDRESS,
-              rawAmount,
-              rawDeadline,
-              {
-                affiliate, // Affiliate address
-                minOdds, // Minimum odds
-                data: betData, // Encoded bet data
-              },
-            ],
-          }),
-        },
-      }),
+      dstChainTokenOutRecipient: walletAddress,
+      dstChainOrderAuthorityAddress: walletAddress,
     });
 
     const deBridgeCreateTxResponse = await fetch(`https://api.dln.trade/v1.0/dln/order/create-tx?${params}`);
     const { orderId, estimation, tx, fixFee }: any = await deBridgeCreateTxResponse.json();
-    console.log(orderId, estimation, tx, fixFee, "betting", deBridgeCreateTxResponse)
-
-    const connection = new Connection(
-      process.env.SOLANA_RPC! || clusterApiUrl('devnet'),
+    const amountFinal = Math.floor(parseFloat(estimation?.dstChainTokenOut?.recommendedAmount));
+    const [outcomeId, currentOdds] = betOption.split(/__/)
+    const data = encodeAbiParameters(parseAbiParameters("uint256, uint64"), [
+      BigInt(conditionId),
+      BigInt(outcomeId),
+    ]);
+    const minOdds = 1 + ((Number(currentOdds) - 1) * (100 - Number(estimation?.recommendedSlippage))) / 100;
+    const oddsDecimals = 6; // in current version of protocol odds has 12 decimals
+    const rawMinOdds = parseUnits(
+      minOdds.toFixed(oddsDecimals),
+      oddsDecimals
     );
-    // console.log(connection, "await", clusterApiUrl('devnet'))
+
+    const externalCall = JSON.stringify({
+      version: 'evm_1',
+      fields: {
+        to: process.env.LP_ADDRESS, // Azuro LP contract address
+        data: encodeFunctionData({
+          abi: lpAbi,
+          functionName: 'betFor',
+          args: [
+            walletAddress,
+            process.env.CORE_ADDRESS,
+            1000000,
+            rawDeadline,
+            {
+              affiliate: affiliate,
+              data,
+              minOdds: rawMinOdds,
+            },
+          ],
+        })
+      },
+    });
+
+    // Update DeBridge API parameters with externalCall
+    params.set('externalCall', externalCall);
+    params.set('dstChainTokenOutAmount', String(amountFinal))
+    console.log(params, "params")
+
+    // Make the final API call to DeBridge with updated parameters
+    const finalDeBridgeResponse = await fetch(`https://api.dln.trade/v1.0/dln/order/create-tx?${params}`);
+    const finalDeBridgeData: any = await finalDeBridgeResponse.json();
+    console.log(finalDeBridgeData, "final")
+
+    const connection = new Connection(process.env.SOLANA_RPC! || 'https://api.mainnet-beta.solana.com');
 
     const minimumBalance = await connection.getMinimumBalanceForRentExemption(0);
-    // console.log(minimumBalance, "min")
-    if (amount * LAMPORTS_PER_SOL < minimumBalance) {
-      throw `Account may not be rent exempt: ${toPubkey.toBase58()}`;
+    if (rawAmount < BigInt(minimumBalance)) {
+      throw `Account may not be rent exempt: ${account.toBase58()}`;
     }
 
-    // get the latest blockhash amd block height
-    const { blockhash, lastValidBlockHeight } =
-      await connection.getLatestBlockhash();
-
-    // create a legacy transaction
+    // Create a Solana transaction
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
     const transaction = new Transaction({
-      feePayer: new PublicKey(body.account),
+      feePayer: account,
       blockhash,
       lastValidBlockHeight,
-    }).add({
-      programId: new PublicKey("tx.to"),
-      keys: [{ pubkey: toPubkey, isSigner: false, isWritable: true }],
-      data: Buffer.from("tx.data.slice(2)", 'hex'),
-    })
+    }).add(
+      SystemProgram.transfer({
+        fromPubkey: account,
+        toPubkey: new PublicKey(finalDeBridgeData.tx),
+        lamports: BigInt(finalDeBridgeData.tx.value),
+      })
+    );
 
-    // const transaction = new Transaction({
-    //   feePayer: new PublicKey(body.account),
-    //   recentBlockhash: (await connection.getRecentBlockhash()).blockhash,
-    // }).add({
-    //   programId: new PublicKey(tx.to),
-    //   keys: [{ pubkey: toPubkey, isSigner: false, isWritable: true }],
-    //   data: Buffer.from(tx.data.slice(2), 'hex'),
-    // });
+    console.log("Created transaction");
 
     const payload: ActionPostResponse = await createPostResponse({
       fields: {
         transaction,
-        message: `Bet placed successfully with a fee of ${fixFee}`,
+        message: `Bet placed successfully with a fee of ${finalDeBridgeData.fixFee}`,
+        // orderId: finalDeBridgeData.orderId,
       },
     });
+    console.log('Response created');
 
-    return Response.json(payload, {
-      headers,
-    });
+    return Response.json(payload, { headers });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     let message = 'An unknown error occurred';
     if (typeof err == 'string') message = err;
-    return new Response(message, {
-      status: 400,
-      headers,
-    });
+    return new Response(message, { status: 400, headers });
   }
 };
 
@@ -404,7 +410,6 @@ async function generateDynamicImage(matchData: any) {
     awayLogo = await loadImage(`${FALLBACK_IMAGE_PATH}`); // Use a placeholder image
   }
 
-  console.log('both logos generated', awayLogo, homeLogo, matchData?.awayTeam, matchData?.homeTeam)
   // Draw team logos
   ctx.drawImage(homeLogo, 50, 200, 200, 200);
   ctx.drawImage(awayLogo, 550, 200, 200, 200);
