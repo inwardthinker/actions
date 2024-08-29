@@ -252,8 +252,9 @@ export const POST = async (req: Request) => {
       BigInt(conditionId),
       BigInt(outcomeId),
     ]);
-    const minOdds = 1 + ((Number(currentOdds) - 1) * (100 - Number(estimation?.recommendedSlippage))) / 100;
-    const oddsDecimals = 6; // in current version of protocol odds has 12 decimals
+    const slippage = 5;
+    const minOdds = 1 + ((Number(currentOdds) - 1) * (100 - Number(slippage))) / 100;
+    const oddsDecimals = 12; // in current version of protocol odds has 12 decimals
     const rawMinOdds = parseUnits(
       minOdds.toFixed(oddsDecimals),
       oddsDecimals
@@ -269,7 +270,7 @@ export const POST = async (req: Request) => {
           args: [
             walletAddress,
             process.env.CORE_ADDRESS,
-            1000000,
+            amountFinal,
             rawDeadline,
             {
               affiliate: affiliate,
@@ -284,19 +285,18 @@ export const POST = async (req: Request) => {
     // Update DeBridge API parameters with externalCall
     params.set('externalCall', externalCall);
     params.set('dstChainTokenOutAmount', String(amountFinal))
-    console.log(params, "params")
 
     // Make the final API call to DeBridge with updated parameters
     const finalDeBridgeResponse = await fetch(`https://api.dln.trade/v1.0/dln/order/create-tx?${params}`);
     const finalDeBridgeData: any = await finalDeBridgeResponse.json();
-    console.log(finalDeBridgeData, "final")
 
-    const connection = new Connection(process.env.SOLANA_RPC! || 'https://api.mainnet-beta.solana.com');
+    const connection = new Connection(process.env.SOLANA_RPC! || 'https://api.devnet.solana.com');
 
     const minimumBalance = await connection.getMinimumBalanceForRentExemption(0);
     if (rawAmount < BigInt(minimumBalance)) {
       throw `Account may not be rent exempt: ${account.toBase58()}`;
     }
+    console.log(finalDeBridgeData, "transaction")
 
     // Create a Solana transaction
     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
@@ -305,23 +305,20 @@ export const POST = async (req: Request) => {
       blockhash,
       lastValidBlockHeight,
     }).add(
-      SystemProgram.transfer({
-        fromPubkey: account,
-        toPubkey: new PublicKey(finalDeBridgeData.tx),
-        lamports: BigInt(finalDeBridgeData.tx.value),
-      })
+      {
+        programId: new PublicKey(finalDeBridgeData.to),
+        keys: [{ pubkey: toPubkey, isSigner: false, isWritable: true }],
+        data: Buffer.from(finalDeBridgeData.data.slice(2), 'hex'),
+      }
     );
-
-    console.log("Created transaction");
 
     const payload: ActionPostResponse = await createPostResponse({
       fields: {
         transaction,
-        message: `Bet placed successfully with a fee of ${finalDeBridgeData.fixFee}`,
+        message: `Bet placed successfully with a fee of ${finalDeBridgeData.fixFee} & orderId ${finalDeBridgeData?.orderId}`,
         // orderId: finalDeBridgeData.orderId,
       },
     });
-    console.log('Response created');
 
     return Response.json(payload, { headers });
   } catch (err) {
@@ -335,7 +332,7 @@ export const POST = async (req: Request) => {
 function validatedQueryParams(requestUrl: URL, body?: any) {
   // console.log(requestUrl, "requesturl", body)
   let toPubkey: PublicKey = new PublicKey(
-    body?.account || "FWXHZxDocgchBjADAxSuyPCVhh6fNLT7DUggabAsuz1y"
+    body?.account
   );
   let amount: number = 0.1;
   let gameId: any;
@@ -346,7 +343,7 @@ function validatedQueryParams(requestUrl: URL, body?: any) {
       toPubkey = new PublicKey(body?.account!);
     }
   } catch (err) {
-    throw 'Invalid input query parameter: to';
+    throw 'Invalid input query parameter: account';
   }
 
   try {
