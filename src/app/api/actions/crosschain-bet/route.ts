@@ -283,7 +283,7 @@ export const POST = async (req: Request) => {
     });
 
     // Update DeBridge API parameters with externalCall
-    params.set('externalCall', externalCall);
+    // params.set('externalCall', externalCall);
     params.set('dstChainTokenOutAmount', String(amountFinal))
 
     // Make the final API call to DeBridge with updated parameters
@@ -296,8 +296,6 @@ export const POST = async (req: Request) => {
     if (rawAmount < BigInt(minimumBalance)) {
       throw `Account may not be rent exempt: ${account.toBase58()}`;
     }
-    console.log(finalDeBridgeData, "transaction")
-
     // Create a Solana transaction
     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
     const transaction = new Transaction({
@@ -306,9 +304,9 @@ export const POST = async (req: Request) => {
       lastValidBlockHeight,
     }).add(
       {
-        programId: new PublicKey(finalDeBridgeData.to),
+        programId: new PublicKey(account),
         keys: [{ pubkey: toPubkey, isSigner: false, isWritable: true }],
-        data: Buffer.from(finalDeBridgeData.data.slice(2), 'hex'),
+        data: Buffer.from(finalDeBridgeData.tx.data.slice(2), 'hex'),
       }
     );
 
@@ -332,7 +330,7 @@ export const POST = async (req: Request) => {
 function validatedQueryParams(requestUrl: URL, body?: any) {
   // console.log(requestUrl, "requesturl", body)
   let toPubkey: PublicKey = new PublicKey(
-    body?.account
+    body?.account || "FWXHZxDocgchBjADAxSuyPCVhh6fNLT7DUggabAsuz1y"
   );
   let amount: number = 0.1;
   let gameId: any;
