@@ -12,11 +12,14 @@ import {
 } from '@solana/actions';
 import {
   clusterApiUrl,
+  ComputeBudgetProgram,
   Connection,
   LAMPORTS_PER_SOL,
   PublicKey,
+  sendAndConfirmTransaction,
   SystemProgram,
   Transaction,
+  TransactionInstruction,
 } from '@solana/web3.js';
 import { createCanvas, loadImage } from 'canvas';
 import { encodeAbiParameters, encodeFunctionData, parseAbiParameters, parseUnits, zeroAddress } from 'viem';
@@ -55,8 +58,8 @@ export const GET = async (req: Request) => {
       startsAt?: string;
       [key: string]: any; // Allow any additional properties
     } = {
-      gameId: "1001000000001594957394",
-      conditionId: "100110010000000015949573940000000000000383398806",
+      gameId: "1001000000001595771060",
+      conditionId: "100110010000000015957710600000000000000386328164",
       outcomes: [],
       homeTeam: {},
       awayTeam: {},
@@ -70,6 +73,7 @@ export const GET = async (req: Request) => {
           sport { name }
           startsAt
           title
+          status
           conditions(where: {conditionId: $conditionId}) {
             conditionId
             outcomes {
@@ -86,9 +90,9 @@ export const GET = async (req: Request) => {
         }
       }
     `;
-
+    
     const variables = { gameId: matchData.gameId, conditionId: matchData.conditionId };
-
+    
     const proxyResponse = await fetch('https://thegraph.azuro.org/subgraphs/name/azuro-protocol/azuro-api-polygon-v3', {
       method: 'POST',
       headers: {
@@ -100,13 +104,14 @@ export const GET = async (req: Request) => {
         variables: variables
       }),
     });
-
+    
     if (!proxyResponse.ok) {
       throw new Error(`API call failed with status ${proxyResponse.status}`);
     }
-
+    
     const data = await proxyResponse.json();
     const game = data?.data?.games[0];
+    console.log(game?.status, "status")
 
     if (game) {
       // Update matchData with fetched data
@@ -127,8 +132,8 @@ export const GET = async (req: Request) => {
 
     const bettingAction = {
       href: `${baseHref}&amount={amount}&gameId=${matchData?.gameId}&conditionId=${matchData?.conditionId}`,
-      label: 'Place Bet',
-      parameters: [
+      label: game?.status === "Created" ? 'Place Bet' : 'Market Closed',
+      parameters: game?.status === "Created" && [
         {
           type: 'radio',
           name: 'betOption',
@@ -155,7 +160,7 @@ export const GET = async (req: Request) => {
         {
           type: 'text',
           name: 'amount',
-          label: 'Enter bet amount (USD)',
+          label: 'Enter bet amount (SOL)',
           required: true,
           pattern: '^[0-9]+(\.[0-9]+)?$',
         },
@@ -166,6 +171,7 @@ export const GET = async (req: Request) => {
 
     const payload = {
       title: `${matchData.homeTeam.name} vs ${matchData.awayTeam.name} `,
+      disabled: game?.status !== "Created",
       icon: `data: image / png; base64, ${base64Image} ` || "https://dev-avatars.azuro.org/images/33/1001000000001595522983/Korona Kielce.png",
       description: `${matchData.sport.name} > ${matchData.league.name}
 ${new Date(parseInt(matchData.startsAt || '0') * 1000).toLocaleString('UTC', {
@@ -180,7 +186,7 @@ ${new Date(parseInt(matchData.startsAt || '0') * 1000).toLocaleString('UTC', {
 
 Bet on your favorite team via SOL now!
 
-Specify your non - CEX polygon wallet address below, correctly.Redeem winnings at sportsbooks.dgbet.fun / bets after the game ends.`,
+Specify your non - CEX polygon wallet address below, correctly. Redeem winnings at sportsbooks.dgbet.fun/bets after the game ends.`,
       label: 'Bet on your favorite team via SOL now!',
       links: {
         actions: [bettingAction],
@@ -285,6 +291,7 @@ export const POST = async (req: Request) => {
     // Update DeBridge API parameters with externalCall
     // params.set('externalCall', externalCall);
     params.set('dstChainTokenOutAmount', String(amountFinal))
+    // params.set('srcChainTokenInAmount', 'auto')
 
     // Make the final API call to DeBridge with updated parameters
     const finalDeBridgeResponse = await fetch(`https://api.dln.trade/v1.0/dln/order/create-tx?${params}`);
@@ -302,19 +309,29 @@ export const POST = async (req: Request) => {
       feePayer: account,
       blockhash,
       lastValidBlockHeight,
-    }).add(
+    })
+    const computeUnitsPrice = ComputeBudgetProgram.setComputeUnitLimit({
+      units: 100000,
+    })
+    const computeUnitsLimit = ComputeBudgetProgram.setComputeUnitPrice({
+      microLamports: 1,
+    })
+
+    const fee = await transaction.getEstimatedFee(connection);
+
+    const mainTransaction = transaction.add(
       {
         programId: new PublicKey(account),
         keys: [{ pubkey: toPubkey, isSigner: false, isWritable: true }],
         data: Buffer.from(finalDeBridgeData.tx.data.slice(2), 'hex'),
       }
     );
+    console.log(fee, "fee")
 
     const payload: ActionPostResponse = await createPostResponse({
       fields: {
-        transaction,
+        transaction: mainTransaction,
         message: `Bet placed successfully with a fee of ${finalDeBridgeData.fixFee} & orderId ${finalDeBridgeData?.orderId}`,
-        // orderId: finalDeBridgeData.orderId,
       },
     });
 
@@ -371,8 +388,8 @@ function validatedQueryParams(requestUrl: URL, body?: any) {
 async function generateDynamicImage(matchData: any) {
 
   // Create the canvas
-  const width = 800;
-  const height = 600;
+  const width = 490;
+  const height = 450;
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
@@ -381,13 +398,13 @@ async function generateDynamicImage(matchData: any) {
   ctx.fillRect(0, 0, width, height);
 
   // Sport and League
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-  ctx.font = '30px Arial';
+  ctx.fillStyle = '#878787';
+  ctx.font = '20px Arial';
   ctx.textAlign = 'center';
   ctx.fillText(matchData.sport.name, width / 2, 120);
   ctx.fillStyle = "white";
-  ctx.font = '40px Arial';
-  ctx.fillText(matchData.league.name, width / 2, 170);
+  ctx.font = '24px Arial';
+  ctx.fillText(matchData.league.name, width / 2, 155);
 
   // Load team logos
   let homeLogo, awayLogo;
@@ -406,18 +423,18 @@ async function generateDynamicImage(matchData: any) {
   }
 
   // Draw team logos
-  ctx.drawImage(homeLogo, 50, 200, 200, 200);
-  ctx.drawImage(awayLogo, 550, 200, 200, 200);
+  ctx.drawImage(homeLogo, 40, 190, 120, 120);
+  ctx.drawImage(awayLogo, 315, 190, 120, 120);
 
   // Draw vs text
   ctx.fillStyle = 'white';
-  ctx.font = '50px Arial';
-  ctx.fillText('V', width / 2, 320);
+  ctx.font = '35px Arial';
+  ctx.fillText('V', width / 2, 280);
 
   // Draw team names
-  ctx.font = '40px Arial';
-  ctx.fillText(matchData.homeTeam.name, 150, 460);
-  ctx.fillText(matchData.awayTeam.name, 650, 460);
+  ctx.font = '25px Arial';
+  ctx.fillText(matchData.homeTeam.name, 100, 350);
+  ctx.fillText(matchData.awayTeam.name, 375, 350);
 
   const buffer = canvas.toBuffer('image/png');
   const base64Image = buffer.toString('base64');
