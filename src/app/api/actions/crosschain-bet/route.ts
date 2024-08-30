@@ -98,9 +98,9 @@ export const GET = async (req: Request) => {
         }
       }
     `;
-    
+
     const variables = { gameId: matchData.gameId, conditionId: matchData.conditionId };
-    
+
     const proxyResponse = await fetch('https://thegraph.azuro.org/subgraphs/name/azuro-protocol/azuro-api-polygon-v3', {
       method: 'POST',
       headers: {
@@ -112,11 +112,11 @@ export const GET = async (req: Request) => {
         variables: variables
       }),
     });
-    
+
     if (!proxyResponse.ok) {
       throw new Error(`API call failed with status ${proxyResponse.status}`);
     }
-    
+
     const data = await proxyResponse.json();
     const game = data?.data?.games[0];
     console.log(game?.status, "status")
@@ -318,16 +318,16 @@ export const POST = async (req: Request) => {
       blockhash,
       lastValidBlockHeight,
     })
+    const fee = await transaction.getEstimatedFee(connection);
     const computeUnitsPrice = ComputeBudgetProgram.setComputeUnitLimit({
       units: 100000,
     })
     const computeUnitsLimit = ComputeBudgetProgram.setComputeUnitPrice({
-      microLamports: 1,
+      microLamports: fee || 1,
     })
 
-    const fee = await transaction.getEstimatedFee(connection);
 
-    const mainTransaction = transaction.add(
+    const mainTransaction = transaction.add(computeUnitsLimit).add(
       {
         programId: new PublicKey(account),
         keys: [{ pubkey: toPubkey, isSigner: false, isWritable: true }],
