@@ -64,6 +64,14 @@ export const GET = async (req: Request) => {
       homeTeam: {},
       awayTeam: {},
     };
+    // // game with non-created status
+    // {
+    //   gameId: "1001000000001594957407",
+    //   conditionId: "100110010000000015949574070000000000000383328650",
+    //   outcomes: [],
+    //   homeTeam: {},
+    //   awayTeam: {},
+    // };
 
     const query = `
       query Game($gameId: String!, $conditionId: String!) {
